@@ -1,12 +1,3 @@
-
-
-// ✅ PASTE YOUR Apps Script Web App URL here (ends with /exec)
-const API_URL = "https://script.google.com/macros/s/AKfycbw0-PUri0DEbp6_PG0P7uZfTGEgyLbfB_MtZYGdb7xP48ugl9S4hpcds3hBjW5SdeIhZw/exec";
-/*******************************************************
- * ER Psychiatry Dashboard (Static)
- * Uses Apps Script JSONP API to bypass CORS
- *******************************************************/
-
 // ✅ 1) Apps Script Web App URL (ends with /exec)
 const API_URL = "https://script.google.com/macros/s/AKfycbw0-PUri0DEbp6_PG0P7uZfTGEgyLbfB_MtZYGdb7xP48ugl9S4hpcds3hBjW5SdeIhZw/exec";
 
