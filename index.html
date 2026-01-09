@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ER Psychiatry Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>ER Psychiatry Case Dashboard</h1>
+        <div class="sub">
+          Last updated: <span id="lastUpdated">—</span>
+          <span class="muted" id="metaInfo"></span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="btnRefresh">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div class="chip active" id="rng_all" data-range="all">All</div>
+      <div class="chip" id="rng_today" data-range="today">Today</div>
+      <div class="chip" id="rng_7d" data-range="7d">Last 7 days</div>
+      <div class="chip" id="rng_30d" data-range="30d">Last 30 days</div>
+    </div>
+
+    <div class="grid stats">
+      <div class="card stat"><div class="label">Total</div><div class="value" id="sTotal">—</div></div>
+      <div class="card stat"><div class="label">Approved</div><div class="value" id="sApproved">—</div></div>
+      <div class="card stat"><div class="label">Pending</div><div class="value" id="sPending">—</div></div>
+      <div class="card stat"><div class="label">On Hold</div><div class="value" id="sOnHold">—</div></div>
+      <div class="card stat"><div class="label">Revision Needed</div><div class="value" id="sNotApproved">—</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr;">
+      <div class="card section">
+        <div class="filters">
+          <input id="q" placeholder="Search Patient ID / Name / Case ID…" />
+
+          <select id="fStatus">
+            <option value="">All status</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="onhold">On Hold</option>
+            <option value="not_approved">Revision Needed</option>
+          </select>
+
+          <select id="fResident">
+            <option value="">All residents</option>
+          </select>
+
+          <select id="fFaculty">
+            <option value="">All faculty</option>
+          </select>
+
+          <select id="pageSize">
+            <option value="10">10 / page</option>
+            <option value="25" selected>25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
+
+        <div id="loading" class="loading">Loading dashboard…</div>
+
+        <div class="tableWrap">
+          <table id="tbl" style="display:none">
+            <thead>
+              <tr>
+                <th data-sort="patientId">Patient ID</th>
+                <th data-sort="patientName">Patient</th>
+                <th>Age/Sex</th>
+                <th class="col-dept" data-sort="dept">Dept</th>
+                <th data-sort="bed">Bed</th>
+                <th data-sort="resident">Resident</th>
+                <th class="col-faculty" data-sort="faculty">Faculty</th>
+                <th class="col-primarydx" data-sort="primaryDx">Primary Dx</th>
+                <th data-sort="status">Status</th>
+                <th data-sort="review">Review Status</th>
+                <th data-sort="submitted">Submitted</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <button class="btn" id="btnPrev">←</button>
+          <div class="muted" id="pageInfo">—</div>
+          <button class="btn" id="btnNext">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb" id="mb">
+    <div class="card modal" id="modalCard">
+      <div class="mh">
+        <div style="font-weight:800" id="mTitle">Case Details</div>
+        <button class="btn" id="btnCloseModal">✕</button>
+      </div>
+      <div class="mbody">
+        <div id="mNice"></div>
+
+        <div class="tabs">
+          <div class="tab active" id="tab_nice" data-tab="nice">Summary View</div>
+          <div class="tab" id="tab_json" data-tab="json">Raw JSON</div>
+        </div>
+
+        <div id="mJson" style="display:none; margin-top:12px;">
+          <pre id="mBody"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
