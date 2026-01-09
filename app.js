@@ -1,17 +1,21 @@
-/*******************************************************
- * Frontend dashboard logic (static site)
- * UPDATED: Uses JSONP (bypasses CORS for Apps Script)
- * API endpoints:
- *   ?action=ping&callback=cbName
- *   ?action=data&callback=cbName
- *******************************************************/
+
 
 // ✅ PASTE YOUR Apps Script Web App URL here (ends with /exec)
 const API_URL = "https://script.google.com/macros/s/AKfycbw0-PUri0DEbp6_PG0P7uZfTGEgyLbfB_MtZYGdb7xP48ugl9S4hpcds3hBjW5SdeIhZw/exec";
+/*******************************************************
+ * ER Psychiatry Dashboard (Static)
+ * Uses Apps Script JSONP API to bypass CORS
+ *******************************************************/
 
-// --------------------
-// JSONP helper (CORS-free)
-// --------------------
+// ✅ 1) Apps Script Web App URL (ends with /exec)
+const API_URL = "https://script.google.com/macros/s/AKfycbw0-PUri0DEbp6_PG0P7uZfTGEgyLbfB_MtZYGdb7xP48ugl9S4hpcds3hBjW5SdeIhZw/exec";
+
+// ✅ 2) Button links
+const KOBO_ADD_CASE_URL        = "https://ee.kobotoolbox.org/x/bubc5Ju9";
+const KOBO_RESIDENT_DATA_URL   = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
+const KOBO_FACULTY_DATA_URL    = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
+
+/* JSONP helper */
 function jsonp(url, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const cbName = "cb_" + Math.random().toString(36).slice(2);
@@ -28,10 +32,14 @@ function jsonp(url, timeoutMs = 20000) {
     };
 
     const script = document.createElement("script");
-    script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cbName;
+    script.src = url
+      + (url.includes("?") ? "&" : "?")
+      + "callback=" + cbName
+      + "&_ts=" + Date.now(); // prevent caching issues
+
     script.onerror = () => {
       cleanup();
-      reject(new Error("JSONP load failed"));
+      reject(new Error("JSONP FAILED"));
     };
 
     const timer = setTimeout(() => {
@@ -43,9 +51,7 @@ function jsonp(url, timeoutMs = 20000) {
   });
 }
 
-// --------------------
-// Your original keys/logic
-// --------------------
+/* Keys */
 const KEYS = {
   caseId:      ["Case ID", "Case_ID", "auto_caseid", "_id"],
   patientId:   ["Patient_ID", "Patient ID", "patient_id"],
@@ -81,7 +87,7 @@ function getAny(obj, arr){
   return "";
 }
 
-// Kobo validation uses uid/label
+/* Status */
 function normalizeStatus(r){
   const vs = r?._validation_status;
   const uid = String(vs?.uid || "").toLowerCase();
@@ -108,6 +114,7 @@ function statusLabel(s){
   return "⏳ Pending";
 }
 
+/* Review */
 function normalizeReview(r){
   const req = String(getAny(r, KEYS.reviewRequired) || "").trim().toLowerCase();
   const dt  = String(getAny(r, KEYS.reviewDateTime) || "").trim();
@@ -130,6 +137,7 @@ function escapeHtml(s){
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 }
 
+/* Range */
 function setRange(rng){
   range = rng;
   ["all","today","7d","30d"].forEach(x => {
@@ -148,32 +156,27 @@ function inRange(ts){
   return ts >= (now.getTime() - days*24*60*60*1000);
 }
 
-// --------------------
-// UPDATED: refresh uses JSONP instead of fetch
-// --------------------
+/* Refresh (JSONP) */
 async function refresh(){
   document.getElementById("loading").style.display = "block";
   document.getElementById("loading").textContent = "Loading dashboard…";
   document.getElementById("tbl").style.display = "none";
 
-  // ping
-  try {
+  // ping (optional)
+  try{
     const p = await jsonp(`${API_URL}?action=ping`);
-    if (p?.ok) {
+    if(p?.ok){
       document.getElementById("metaInfo").textContent = `• ${p.version}`;
     }
-  } catch (_) {
-    // ignore ping failures
-  }
+  }catch(_){}
 
   // data
-  try {
+  try{
     const data = await jsonp(`${API_URL}?action=data`);
     render(data);
-  } catch (err) {
+  }catch(err){
     console.error(err);
-    document.getElementById("loading").textContent =
-      "Error: " + (err?.message || String(err));
+    document.getElementById("loading").textContent = "Error: " + (err?.message || String(err));
   }
 }
 
@@ -234,6 +237,7 @@ function buildSelect(id, statsObj, placeholder){
   sel.value = keep;
 }
 
+/* Filters + sorting */
 function applyFilters(){
   const q = document.getElementById("q").value.trim().toLowerCase();
   const st = document.getElementById("fStatus").value;
@@ -264,164 +268,5 @@ function sortBy(key){
 }
 
 function getSortVal(r, key){
-  if(key === "status") return r.__status;
-  if(key === "review") return r.__review;
-  if(key === "submitted") return r.__submitted_ts;
-
-  const map = {
-    caseId: KEYS.caseId,
-    patientId: KEYS.patientId,
-    patientName: KEYS.patientName,
-    dept: KEYS.dept,
-    bed: KEYS.bed,
-    resident: KEYS.resident,
-    faculty: KEYS.faculty,
-    primaryDx: KEYS.primaryDx
-  };
-  return String(getAny(r, map[key] || []) || "").toLowerCase();
-}
-
-function sortAndRender(){
-  const dir = (sortDir === "asc") ? 1 : -1;
-  VIEW.sort((a,b)=>{
-    const va = getSortVal(a, sortKey);
-    const vb = getSortVal(b, sortKey);
-    if(va < vb) return -1*dir;
-    if(va > vb) return  1*dir;
-    return 0;
-  });
-  renderPage();
-}
-
-function renderPage(){
-  const total = VIEW.length;
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  page = Math.min(page, pages);
-
-  const start = (page-1)*pageSize;
-  const slice = VIEW.slice(start, start + pageSize);
-
-  const tbody = document.getElementById("tbody");
-  tbody.innerHTML = slice.map((r, idx) => {
-    const st = r.__status;
-    const rv = r.__review;
-    const submitted = getAny(r, KEYS.submitted)
-      ? new Date(getAny(r, KEYS.submitted)).toLocaleString()
-      : "—";
-
-    return `
-      <tr>
-        <td>${escapeHtml(getAny(r, KEYS.patientId) || "—")}</td>
-        <td>${escapeHtml(getAny(r, KEYS.patientName) || "—")}</td>
-        <td>${escapeHtml(getAny(r, KEYS.age) || "—")} / ${escapeHtml(getAny(r, KEYS.sex) || "—")}</td>
-        <td class="col-dept">${escapeHtml(getAny(r, KEYS.dept) || "—")}</td>
-        <td>${escapeHtml(getAny(r, KEYS.bed) || "—")}</td>
-        <td>${escapeHtml(getAny(r, KEYS.resident) || "—")}</td>
-        <td class="col-faculty">${escapeHtml(getAny(r, KEYS.faculty) || "—")}</td>
-        <td class="col-primarydx">${escapeHtml(getAny(r, KEYS.primaryDx) || "—")}</td>
-        <td><span class="badge b-${st}">${statusLabel(st)}</span></td>
-        <td><span class="badge b-${rv}">${reviewLabel(rv)}</span></td>
-        <td>${escapeHtml(submitted)}</td>
-        <td><button class="btn" data-open="${start + idx}">View</button></td>
-      </tr>
-    `;
-  }).join("");
-
-  document.getElementById("pageInfo").textContent =
-    `Page ${page}/${Math.max(1, Math.ceil(total/pageSize))} • ${total} cases`;
-
-  document.querySelectorAll('button[data-open]').forEach(btn => {
-    btn.addEventListener("click", () => openCase(parseInt(btn.dataset.open, 10)));
-  });
-}
-
-function prevPage(){ page = Math.max(1, page-1); renderPage(); }
-function nextPage(){
-  const pages = Math.max(1, Math.ceil(VIEW.length / pageSize));
-  page = Math.min(pages, page+1);
-  renderPage();
-}
-function changePageSize(){
-  pageSize = parseInt(document.getElementById("pageSize").value, 10) || 25;
-  page = 1;
-  renderPage();
-}
-
-function openCase(index){
-  const r = VIEW[index];
-  const st = r.__status;
-
-  document.getElementById("mTitle").textContent =
-    `${getAny(r, KEYS.patientId) || "—"} • ${getAny(r, KEYS.patientName) || "—"} • ${statusLabel(st)}`;
-
-  const nicePairs = [
-    ["Case ID", getAny(r, KEYS.caseId)],
-    ["Patient ID", getAny(r, KEYS.patientId)],
-    ["Patient Name", getAny(r, KEYS.patientName)],
-    ["Age / Sex", `${getAny(r, KEYS.age) || "—"} / ${getAny(r, KEYS.sex) || "—"}`],
-    ["Department", getAny(r, KEYS.dept)],
-    ["Bed No", getAny(r, KEYS.bed)],
-    ["Primary Diagnosis", getAny(r, KEYS.primaryDx)],
-    ["Diagnosis", getAny(r, KEYS.diagnosis)],
-    ["Management", getAny(r, KEYS.management)],
-    ["Submitted", getAny(r, KEYS.submitted)]
-  ];
-
-  document.getElementById("mNice").innerHTML =
-    nicePairs.filter(([k,v]) => String(v||"").trim() !== "")
-      .map(([k,v]) => `<div class="kv"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`)
-      .join("") || `<div class="muted">No details</div>`;
-
-  document.getElementById("mBody").textContent = JSON.stringify(r, null, 2);
-
-  switchTab("nice");
-  document.getElementById("mb").style.display = "flex";
-}
-
-function switchTab(which){
-  const nice = document.getElementById("mNice");
-  const json = document.getElementById("mJson");
-  document.getElementById("tab_nice").classList.toggle("active", which === "nice");
-  document.getElementById("tab_json").classList.toggle("active", which === "json");
-  nice.style.display = (which === "nice") ? "block" : "none";
-  json.style.display = (which === "json") ? "block" : "none";
-}
-
-function closeModal(){
-  document.getElementById("mb").style.display = "none";
-}
-
-// --------------------
-// Wire up UI events
-// --------------------
-document.getElementById("btnRefresh").addEventListener("click", refresh);
-
-document.querySelectorAll(".chip[data-range]").forEach(ch => {
-  ch.addEventListener("click", () => setRange(ch.dataset.range));
-});
-
-document.getElementById("q").addEventListener("input", applyFilters);
-document.getElementById("fStatus").addEventListener("change", applyFilters);
-document.getElementById("fResident").addEventListener("change", applyFilters);
-document.getElementById("fFaculty").addEventListener("change", applyFilters);
-
-document.getElementById("pageSize").addEventListener("change", () => {
-  changePageSize();
-});
-
-document.getElementById("btnPrev").addEventListener("click", prevPage);
-document.getElementById("btnNext").addEventListener("click", nextPage);
-
-document.getElementById("btnCloseModal").addEventListener("click", closeModal);
-
-document.getElementById("mb").addEventListener("click", (e) => {
-  if (e.target.id === "mb") closeModal();
-});
-
-document.querySelectorAll(".tab[data-tab]").forEach(t => {
-  t.addEventListener("click", () => switchTab(t.dataset.tab));
-});
-
-// initial load
-refresh();
+  if(key === "status") re
 
