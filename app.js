@@ -1,3 +1,8 @@
+document.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("loading");
+  if (el) el.textContent = "JS loaded ✅ (now calling API...)";
+});
+
 // ✅ REPLACE THIS with your Apps Script /exec URL
 const API_URL = "https://script.google.com/macros/s/AKfycbwSj5RLkOu5m4O6cxJu9-lE4T0Akz2ZfVeVh1OCHabE7uqPnTA8skJzI7uhSto-L16aFw/exec";
 
