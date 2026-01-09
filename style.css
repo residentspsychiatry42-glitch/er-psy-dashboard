@@ -19,7 +19,6 @@ h1{margin:0; font-size:22px;}
 }
 .btn:hover{filter:brightness(.98);}
 
-/* Link buttons */
 a.btn{
   text-decoration:none;
   color:inherit;
@@ -29,7 +28,6 @@ a.btn{
   gap:6px;
 }
 
-/* Primary button (Add Case) */
 .btn-primary{
   background:#111827;
   color:#fff;
@@ -53,13 +51,11 @@ th,td{border-bottom:1px solid var(--line); padding:10px; font-size:13px; text-al
 th{color:var(--muted); user-select:none; cursor:pointer;}
 .badge{display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid var(--line); font-size:12px;}
 
-/* Validation badges */
 .b-approved{background:#ecfdf5;}
 .b-pending{background:#fffbeb;}
 .b-not_approved{background:#fef2f2;}
 .b-onhold{background:#eff6ff;}
 
-/* Review badges */
 .b-review_pending{background:#fff7ed;}
 .b-reviewed{background:#ecfeff;}
 .b-no_review{background:#f3f4f6;}
@@ -68,7 +64,6 @@ th{color:var(--muted); user-select:none; cursor:pointer;}
 .pager{display:flex; gap:10px; align-items:center; justify-content:flex-end; margin-top:12px;}
 .loading{padding:18px; text-align:center; color:var(--muted);}
 
-/* Mobile-friendly table: horizontal swipe */
 .tableWrap{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
 .tableWrap table{min-width:1100px;}
 
@@ -92,12 +87,10 @@ pre{white-space:pre-wrap; word-break:break-word; background:#0b1220; color:#e5e7
   th,td{padding:8px;}
 }
 
-/* Hide some columns on small phones */
 @media(max-width: 600px){
   .col-dept, .col-faculty, .col-primarydx { display:none; }
   input,select{padding:9px 10px;}
 
-  /* Buttons full-width on phones */
   .top .row{width:100%;}
   .top .row .btn{flex:1;}
 }
