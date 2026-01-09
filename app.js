@@ -1,13 +1,51 @@
 /*******************************************************
  * Frontend dashboard logic (static site)
- * Uses Apps Script Web App JSON API:
- *   ?action=ping
- *   ?action=data
+ * UPDATED: Uses JSONP (bypasses CORS for Apps Script)
+ * API endpoints:
+ *   ?action=ping&callback=cbName
+ *   ?action=data&callback=cbName
  *******************************************************/
 
 // ✅ PASTE YOUR Apps Script Web App URL here (ends with /exec)
-const API_URL = "https://script.google.com/macros/s/AKfycbxWo8oso7UXzam3YoFVNTTLXeARPTus5yoFzI8aGUfy/dev";
+const API_URL = "https://script.google.com/macros/s/AKfycbw0-PUri0DEbp6_PG0P7uZfTGEgyLbfB_MtZYGdb7xP48ugl9S4hpcds3hBjW5SdeIhZw/exec";
 
+// --------------------
+// JSONP helper (CORS-free)
+// --------------------
+function jsonp(url, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const cbName = "cb_" + Math.random().toString(36).slice(2);
+
+    function cleanup() {
+      try { delete window[cbName]; } catch (_) {}
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    }
+
+    window[cbName] = (data) => {
+      cleanup();
+      resolve(data);
+    };
+
+    const script = document.createElement("script");
+    script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cbName;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("JSONP load failed"));
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("JSONP timeout"));
+    }, timeoutMs);
+
+    document.body.appendChild(script);
+  });
+}
+
+// --------------------
+// Your original keys/logic
+// --------------------
 const KEYS = {
   caseId:      ["Case ID", "Case_ID", "auto_caseid", "_id"],
   patientId:   ["Patient_ID", "Patient ID", "patient_id"],
@@ -43,6 +81,7 @@ function getAny(obj, arr){
   return "";
 }
 
+// Kobo validation uses uid/label
 function normalizeStatus(r){
   const vs = r?._validation_status;
   const uid = String(vs?.uid || "").toLowerCase();
@@ -109,44 +148,44 @@ function inRange(ts){
   return ts >= (now.getTime() - days*24*60*60*1000);
 }
 
-async function pingAPI(){
-  try{
-    const res = await fetch(`${API_URL}?action=ping`, { cache: "no-store" });
-    const p = await res.json();
-    if(p?.ok){
-      document.getElementById("metaInfo").textContent = `• ${p.version}`;
-    }
-  }catch(e){
-    // ignore
-  }
-}
-
+// --------------------
+// UPDATED: refresh uses JSONP instead of fetch
+// --------------------
 async function refresh(){
   document.getElementById("loading").style.display = "block";
   document.getElementById("loading").textContent = "Loading dashboard…";
   document.getElementById("tbl").style.display = "none";
 
-  await pingAPI();
+  // ping
+  try {
+    const p = await jsonp(`${API_URL}?action=ping`);
+    if (p?.ok) {
+      document.getElementById("metaInfo").textContent = `• ${p.version}`;
+    }
+  } catch (_) {
+    // ignore ping failures
+  }
 
-  try{
-    const res = await fetch(`${API_URL}?action=data`, { cache: "no-store" });
-    const data = await res.json();
+  // data
+  try {
+    const data = await jsonp(`${API_URL}?action=data`);
     render(data);
-  }catch(err){
+  } catch (err) {
     console.error(err);
-    document.getElementById("loading").textContent = "Error: " + (err?.message || String(err));
+    document.getElementById("loading").textContent =
+      "Error: " + (err?.message || String(err));
   }
 }
 
 function render(data){
   try{
-    if(data.error){
+    if(data?.error){
       document.getElementById("loading").textContent =
         `Error: ${data.error} ${data.message ? ("- " + data.message) : ""}`;
       return;
     }
 
-    if(data.meta?.version){
+    if(data?.meta?.version){
       document.getElementById("metaInfo").textContent =
         `• ${data.meta.version} • cache ${data.meta.cacheSeconds || 0}s`;
     }
@@ -157,7 +196,8 @@ function render(data){
     document.getElementById("sOnHold").textContent = data.stats?.onhold ?? 0;
     document.getElementById("sNotApproved").textContent = data.stats?.not_approved ?? 0;
 
-    document.getElementById("lastUpdated").textContent = new Date(data.lastUpdated).toLocaleString();
+    document.getElementById("lastUpdated").textContent =
+      data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "—";
 
     RAW = (data.cases || []).map(r => {
       r.__status = normalizeStatus(r);
@@ -265,7 +305,9 @@ function renderPage(){
   tbody.innerHTML = slice.map((r, idx) => {
     const st = r.__status;
     const rv = r.__review;
-    const submitted = getAny(r, KEYS.submitted) ? new Date(getAny(r, KEYS.submitted)).toLocaleString() : "—";
+    const submitted = getAny(r, KEYS.submitted)
+      ? new Date(getAny(r, KEYS.submitted)).toLocaleString()
+      : "—";
 
     return `
       <tr>
@@ -288,7 +330,6 @@ function renderPage(){
   document.getElementById("pageInfo").textContent =
     `Page ${page}/${Math.max(1, Math.ceil(total/pageSize))} • ${total} cases`;
 
-  // attach view handlers
   document.querySelectorAll('button[data-open]').forEach(btn => {
     btn.addEventListener("click", () => openCase(parseInt(btn.dataset.open, 10)));
   });
@@ -374,7 +415,6 @@ document.getElementById("btnNext").addEventListener("click", nextPage);
 document.getElementById("btnCloseModal").addEventListener("click", closeModal);
 
 document.getElementById("mb").addEventListener("click", (e) => {
-  // close when clicking outside modal card
   if (e.target.id === "mb") closeModal();
 });
 
@@ -384,3 +424,4 @@ document.querySelectorAll(".tab[data-tab]").forEach(t => {
 
 // initial load
 refresh();
+
