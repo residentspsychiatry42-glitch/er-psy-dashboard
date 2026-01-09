@@ -1,3 +1,13 @@
+// ===== DEBUG GUARD (shows errors on the page) =====
+window.addEventListener("error", (e) => {
+  const box = document.getElementById("loading");
+  if (box) box.textContent = "JS Error: " + (e.message || "Unknown error");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const box = document.getElementById("loading");
+  if (box) box.textContent = "Promise Error: " + (e.reason?.message || e.reason || "Unknown rejection");
+});
+
 // ✅ 1) Apps Script Web App URL (ends with /exec)
 const API_URL = "https://script.google.com/macros/s/AKfycbzhl-2eZ_BpEm-3KPGSMinySd2UY5E5PosKuhbw9YC-76BVHkNwE-dlbnW0TYz1CN-aig/exec";
 
