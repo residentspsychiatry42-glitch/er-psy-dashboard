@@ -1,4 +1,7 @@
-// ===== DEBUG GUARD (shows errors on the page) =====
+// ✅ REPLACE THIS with your Apps Script /exec URL
+const API_URL = "https://script.google.com/macros/s/AKfycbwSj5RLkOu5m4O6cxJu9-lE4T0Akz2ZfVeVh1OCHabE7uqPnTA8skJzI7uhSto-L16aFw/exec";
+
+// Show errors inside the loading area (so you never get “silent stuck”)
 window.addEventListener("error", (e) => {
   const box = document.getElementById("loading");
   if (box) box.textContent = "JS Error: " + (e.message || "Unknown error");
@@ -8,29 +11,7 @@ window.addEventListener("unhandledrejection", (e) => {
   if (box) box.textContent = "Promise Error: " + (e.reason?.message || e.reason || "Unknown rejection");
 });
 
-// ✅ 1) Apps Script Web App URL (ends with /exec)
-const API_URL = "https://script.google.com/macros/s/AKfycbzhl-2eZ_BpEm-3KPGSMinySd2UY5E5PosKuhbw9YC-76BVHkNwE-dlbnW0TYz1CN-aig/exec";
-
-// ✅ 2) Button links
-const KOBO_ADD_CASE_URL        = "https://ee.kobotoolbox.org/x/bubc5Ju9";
-const KOBO_RESIDENT_DATA_URL   = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
-const KOBO_FACULTY_DATA_URL    = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
-
-/*******************************************************
- * ER Psychiatry Dashboard (Static) - FINAL FAST VERSION
- * - JSONP + retries + cache-busting
- * - Loads STATS first (fast), then CASES (table)
- *******************************************************/
-
-// 1) Apps Script Web App URL (ends with /exec)
-const API_URL = "PASTE_YOUR_APPS_SCRIPT_WEBAPP_URL_HERE";
-
-// 2) Button links
-const KOBO_ADD_CASE_URL        = "https://ee.kobotoolbox.org/x/bubc5Ju9";
-const KOBO_RESIDENT_DATA_URL   = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
-const KOBO_FACULTY_DATA_URL    = "https://kf.kobotoolbox.org/#/forms/apB4HwDv3mNjTwg38qxCu4/data/table";
-
-// ---------- JSONP ----------
+// JSONP
 function jsonp(url, timeoutMs = 25000) {
   return new Promise((resolve, reject) => {
     const cbName = "cb_" + Math.random().toString(36).slice(2);
@@ -47,7 +28,7 @@ function jsonp(url, timeoutMs = 25000) {
     script.src = url
       + (url.includes("?") ? "&" : "?")
       + "callback=" + cbName
-      + "&_ts=" + Date.now(); // cache-bust (mobile + incognito reliability)
+      + "&_ts=" + Date.now();
 
     script.onerror = () => { cleanup(); reject(new Error("JSONP FAILED")); };
 
@@ -63,17 +44,16 @@ function jsonp(url, timeoutMs = 25000) {
 async function jsonpRetry(url, retries = 3) {
   let lastErr;
   for (let i = 0; i < retries; i++) {
-    try {
-      return await jsonp(url);
-    } catch (e) {
+    try { return await jsonp(url); }
+    catch (e) {
       lastErr = e;
-      await new Promise(r => setTimeout(r, 600 * Math.pow(2, i))); // 0.6s,1.2s,2.4s
+      await new Promise(r => setTimeout(r, 600 * Math.pow(2, i)));
     }
   }
   throw lastErr;
 }
 
-// ---------- Keys ----------
+// Keys
 const KEYS = {
   caseId:      ["auto_caseid", "Case ID", "Case_ID", "_id"],
   patientId:   ["Patient_ID", "Patient ID", "patient_id"],
@@ -100,7 +80,6 @@ let sortKey = "submitted";
 let sortDir = "desc";
 let range = "all";
 
-// ---------- Helpers ----------
 function getAny(obj, arr){
   for(const k of arr){
     const v = obj?.[k];
@@ -140,9 +119,7 @@ function statusLabel(s){
 function normalizeReview(r){
   const req = String(getAny(r, KEYS.reviewRequired) || "").trim().toLowerCase();
   const dt  = String(getAny(r, KEYS.reviewDateTime) || "").trim();
-  if(req === "yes" || req === "true"){
-    return dt ? "reviewed" : "review_pending";
-  }
+  if(req === "yes" || req === "true") return dt ? "reviewed" : "review_pending";
   return "no_review";
 }
 function reviewLabel(s){
@@ -151,7 +128,6 @@ function reviewLabel(s){
   return "⬜ Not Required";
 }
 
-// ---------- Range ----------
 function setRange(rng){
   range = rng;
   ["all","today","7d","30d"].forEach(x => {
@@ -169,7 +145,6 @@ function inRange(ts){
   return ts >= (now.getTime() - days*24*60*60*1000);
 }
 
-// ---------- UI Builders ----------
 function buildSelect(id, statsObj, placeholder){
   const sel = document.getElementById(id);
   if(!sel) return;
@@ -184,83 +159,76 @@ function buildSelect(id, statsObj, placeholder){
   sel.value = keep;
 }
 
-// ---------- Fast refresh (stats first) ----------
 async function refresh(){
-  document.getElementById("loading").style.display = "block";
-  document.getElementById("loading").textContent = "Loading dashboard…";
-  document.getElementById("tbl").style.display = "none";
+  const loading = document.getElementById("loading");
+  const tbl = document.getElementById("tbl");
+  if (loading) { loading.style.display = "block"; loading.textContent = "Loading dashboard…"; }
+  if (tbl) tbl.style.display = "none";
 
-  // Ping (non-blocking)
+  // ping (optional)
   try{
     const p = await jsonpRetry(`${API_URL}?action=ping`, 2);
-    if(p?.ok) document.getElementById("metaInfo").textContent = `• ${p.version}`;
+    const meta = document.getElementById("metaInfo");
+    if(meta && p?.ok) meta.textContent = `• ${p.version}`;
   }catch(_){}
 
-  // 1) Stats fast
+  // fast stats
   try{
     const s = await jsonpRetry(`${API_URL}?action=stats`, 3);
     if(s?.error) throw new Error(s.error + (s.message ? " - " + s.message : ""));
 
-    document.getElementById("sTotal").textContent = s.stats?.total ?? 0;
-    document.getElementById("sApproved").textContent = s.stats?.approved ?? 0;
-    document.getElementById("sPending").textContent = s.stats?.pending ?? 0;
-    document.getElementById("sOnHold").textContent = s.stats?.onhold ?? 0;
-    document.getElementById("sNotApproved").textContent = s.stats?.not_approved ?? 0;
+    const setText = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    setText("sTotal", s.stats?.total ?? 0);
+    setText("sApproved", s.stats?.approved ?? 0);
+    setText("sPending", s.stats?.pending ?? 0);
+    setText("sOnHold", s.stats?.onhold ?? 0);
+    setText("sNotApproved", s.stats?.not_approved ?? 0);
 
-    document.getElementById("lastUpdated").textContent =
-      s.lastUpdated ? new Date(s.lastUpdated).toLocaleString() : "—";
+    const last = document.getElementById("lastUpdated");
+    if(last) last.textContent = s.lastUpdated ? new Date(s.lastUpdated).toLocaleString() : "—";
 
-    if(s.meta?.version) {
-      document.getElementById("metaInfo").textContent =
-        `• ${s.meta.version} • cache ${s.meta.cacheSeconds || 0}s`;
+    if(s.meta?.version){
+      const meta = document.getElementById("metaInfo");
+      if(meta) meta.textContent = `• ${s.meta.version} • cache ${s.meta.cacheSeconds || 0}s`;
     }
 
     buildSelect("fResident", s.residentStats || {}, "All residents");
     buildSelect("fFaculty", s.facultyStats || {}, "All faculty");
 
   }catch(err){
-    document.getElementById("loading").textContent = "Error loading stats: " + (err.message || err);
+    if (loading) loading.textContent = "Error loading stats: " + (err.message || err);
     return;
   }
 
-  // 2) Cases slower
-  document.getElementById("loading").textContent = "Loading cases list…";
+  if (loading) loading.textContent = "Loading cases list…";
+
+  // cases
   try{
     const data = await jsonpRetry(`${API_URL}?action=data`, 3);
-    render(data);
+    if(data?.error) throw new Error(data.error + (data.message ? " - " + data.message : ""));
+
+    RAW = (data.cases || []).map(r => {
+      r.__status = normalizeStatus(r);
+      r.__review = normalizeReview(r);
+      r.__submitted_ts = new Date(getAny(r, KEYS.submitted) || 0).getTime();
+      return r;
+    });
+
+    page = 1;
+    applyFilters();
+
+    if (loading) loading.style.display = "none";
+    if (tbl) tbl.style.display = "table";
   }catch(err){
-    document.getElementById("loading").textContent =
-      "Cases list failed. Tap Refresh. (" + (err.message || err) + ")";
+    if (loading) loading.textContent = "Cases list failed. Tap Refresh. (" + (err.message || err) + ")";
   }
 }
 
-function render(data){
-  if(data?.error){
-    document.getElementById("loading").textContent =
-      `Error: ${data.error}${data.message ? (" - " + data.message) : ""}`;
-    return;
-  }
-
-  RAW = (data.cases || []).map(r => {
-    r.__status = normalizeStatus(r);
-    r.__review = normalizeReview(r);
-    r.__submitted_ts = new Date(getAny(r, KEYS.submitted) || 0).getTime();
-    return r;
-  });
-
-  page = 1;
-  applyFilters();
-
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("tbl").style.display = "table";
-}
-
-// ---------- Filtering / sorting ----------
 function applyFilters(){
-  const q = document.getElementById("q").value.trim().toLowerCase();
-  const st = document.getElementById("fStatus").value;
-  const res = document.getElementById("fResident").value;
-  const fac = document.getElementById("fFaculty").value;
+  const q = (document.getElementById("q")?.value || "").trim().toLowerCase();
+  const st = document.getElementById("fStatus")?.value || "";
+  const res = document.getElementById("fResident")?.value || "";
+  const fac = document.getElementById("fFaculty")?.value || "";
 
   VIEW = RAW.filter(r => {
     const caseId = String(getAny(r, KEYS.caseId) || "").toLowerCase();
@@ -284,7 +252,6 @@ function sortBy(key){
   else { sortKey = key; sortDir = "asc"; }
   sortAndRender();
 }
-
 function getSortVal(r, key){
   if(key === "status") return r.__status;
   if(key === "review") return r.__review;
@@ -302,7 +269,6 @@ function getSortVal(r, key){
   };
   return String(getAny(r, map[key] || []) || "").toLowerCase();
 }
-
 function sortAndRender(){
   const dir = (sortDir === "asc") ? 1 : -1;
   VIEW.sort((a,b)=>{
@@ -324,6 +290,8 @@ function renderPage(){
   const slice = VIEW.slice(start, start + pageSize);
 
   const tbody = document.getElementById("tbody");
+  if(!tbody) return;
+
   tbody.innerHTML = slice.map((r, idx) => {
     const st = r.__status;
     const rv = r.__review;
@@ -349,8 +317,8 @@ function renderPage(){
     `;
   }).join("");
 
-  document.getElementById("pageInfo").textContent =
-    `Page ${page}/${Math.max(1, Math.ceil(total/pageSize))} • ${total} cases`;
+  const pageInfo = document.getElementById("pageInfo");
+  if(pageInfo) pageInfo.textContent = `Page ${page}/${pages} • ${total} cases`;
 
   document.querySelectorAll('button[data-open]').forEach(btn => {
     btn.addEventListener("click", () => openCase(parseInt(btn.dataset.open, 10)));
@@ -364,18 +332,20 @@ function nextPage(){
   renderPage();
 }
 function changePageSize(){
-  pageSize = parseInt(document.getElementById("pageSize").value, 10) || 25;
+  pageSize = parseInt(document.getElementById("pageSize")?.value || "25", 10) || 25;
   page = 1;
   renderPage();
 }
 
-// ---------- Modal ----------
 function openCase(index){
   const r = VIEW[index];
-  const st = r.__status;
+  if(!r) return;
 
-  document.getElementById("mTitle").textContent =
-    `${getAny(r, KEYS.patientId) || "—"} • ${getAny(r, KEYS.patientName) || "—"} • ${statusLabel(st)}`;
+  const st = r.__status;
+  const title = document.getElementById("mTitle");
+  if(title){
+    title.textContent = `${getAny(r, KEYS.patientId) || "—"} • ${getAny(r, KEYS.patientName) || "—"} • ${statusLabel(st)}`;
+  }
 
   const nicePairs = [
     ["Case ID", getAny(r, KEYS.caseId)],
@@ -390,62 +360,80 @@ function openCase(index){
     ["Submitted", getAny(r, KEYS.submitted)]
   ];
 
-  document.getElementById("mNice").innerHTML =
-    nicePairs.filter(([k,v]) => String(v||"").trim() !== "")
+  const mNice = document.getElementById("mNice");
+  if(mNice){
+    mNice.innerHTML = nicePairs.filter(([k,v]) => String(v||"").trim() !== "")
       .map(([k,v]) => `<div class="kv"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`)
       .join("") || `<div class="muted">No details</div>`;
+  }
 
-  document.getElementById("mBody").textContent = JSON.stringify(r, null, 2);
+  const mBody = document.getElementById("mBody");
+  if(mBody) mBody.textContent = JSON.stringify(r, null, 2);
 
   switchTab("nice");
-  document.getElementById("mb").style.display = "flex";
+  const mb = document.getElementById("mb");
+  if(mb) mb.style.display = "flex";
 }
 
 function switchTab(which){
   const nice = document.getElementById("mNice");
   const json = document.getElementById("mJson");
-  document.getElementById("tab_nice").classList.toggle("active", which === "nice");
-  document.getElementById("tab_json").classList.toggle("active", which === "json");
-  nice.style.display = (which === "nice") ? "block" : "none";
-  json.style.display = (which === "json") ? "block" : "none";
+  const tn = document.getElementById("tab_nice");
+  const tj = document.getElementById("tab_json");
+
+  if(tn) tn.classList.toggle("active", which === "nice");
+  if(tj) tj.classList.toggle("active", which === "json");
+  if(nice) nice.style.display = (which === "nice") ? "block" : "none";
+  if(json) json.style.display = (which === "json") ? "block" : "none";
 }
 
-function closeModal(){ document.getElementById("mb").style.display = "none"; }
+function closeModal(){
+  const mb = document.getElementById("mb");
+  if(mb) mb.style.display = "none";
+}
 
-// ---------- Wire events ----------
-document.getElementById("btnRefresh").addEventListener("click", refresh);
+// ✅ Null-safe event wiring (prevents crashes)
+const _r = document.getElementById("btnRefresh");
+if(_r) _r.addEventListener("click", refresh);
 
 document.querySelectorAll(".chip[data-range]").forEach(ch => {
   ch.addEventListener("click", () => setRange(ch.dataset.range));
 });
 
-document.getElementById("q").addEventListener("input", applyFilters);
-document.getElementById("fStatus").addEventListener("change", applyFilters);
-document.getElementById("fResident").addEventListener("change", applyFilters);
-document.getElementById("fFaculty").addEventListener("change", applyFilters);
+const _q = document.getElementById("q");
+if(_q) _q.addEventListener("input", applyFilters);
 
-document.getElementById("pageSize").addEventListener("change", changePageSize);
-document.getElementById("btnPrev").addEventListener("click", prevPage);
-document.getElementById("btnNext").addEventListener("click", nextPage);
+const _fs = document.getElementById("fStatus");
+if(_fs) _fs.addEventListener("change", applyFilters);
 
-document.getElementById("btnCloseModal").addEventListener("click", closeModal);
-document.getElementById("mb").addEventListener("click", (e) => { if (e.target.id === "mb") closeModal(); });
+const _fr = document.getElementById("fResident");
+if(_fr) _fr.addEventListener("change", applyFilters);
+
+const _ff = document.getElementById("fFaculty");
+if(_ff) _ff.addEventListener("change", applyFilters);
+
+const _ps = document.getElementById("pageSize");
+if(_ps) _ps.addEventListener("change", changePageSize);
+
+const _p = document.getElementById("btnPrev");
+if(_p) _p.addEventListener("click", prevPage);
+
+const _n = document.getElementById("btnNext");
+if(_n) _n.addEventListener("click", nextPage);
+
+const _cm = document.getElementById("btnCloseModal");
+if(_cm) _cm.addEventListener("click", closeModal);
+
+const _mb = document.getElementById("mb");
+if(_mb) _mb.addEventListener("click", (e) => { if (e.target.id === "mb") closeModal(); });
 
 document.querySelectorAll(".tab[data-tab]").forEach(t => {
   t.addEventListener("click", () => switchTab(t.dataset.tab));
 });
 
-// Sort header clicks
 document.querySelectorAll("th[data-sort]").forEach(th => {
   th.addEventListener("click", () => sortBy(th.dataset.sort));
 });
 
-// Wire 3 button links (kept in JS so you can change once)
-document.getElementById("btnAddCase").href = KOBO_ADD_CASE_URL;
-document.getElementById("btnResidentData").href = KOBO_RESIDENT_DATA_URL;
-document.getElementById("btnFacultyData").href = KOBO_FACULTY_DATA_URL;
-
-// Initial load
+// Start
 refresh();
-
-
