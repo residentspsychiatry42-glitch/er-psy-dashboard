@@ -9,8 +9,34 @@ body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; backgr
 h1{margin:0; font-size:22px;}
 .sub{color:var(--muted); font-size:12px; margin-top:4px;}
 .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-.btn{border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px; cursor:pointer;}
+
+.btn{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+}
 .btn:hover{filter:brightness(.98);}
+
+/* Link buttons */
+a.btn{
+  text-decoration:none;
+  color:inherit;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+
+/* Primary button (Add Case) */
+.btn-primary{
+  background:#111827;
+  color:#fff;
+  border-color:#111827;
+}
+.btn-primary:hover{filter:brightness(1.05);}
+
 .chip{border:1px solid var(--line); background:#fff; border-radius:999px; padding:8px 12px; cursor:pointer; font-size:13px;}
 .chip.active{background:#111827; color:#fff; border-color:#111827;}
 .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);}
@@ -70,4 +96,8 @@ pre{white-space:pre-wrap; word-break:break-word; background:#0b1220; color:#e5e7
 @media(max-width: 600px){
   .col-dept, .col-faculty, .col-primarydx { display:none; }
   input,select{padding:9px 10px;}
+
+  /* Buttons full-width on phones */
+  .top .row{width:100%;}
+  .top .row .btn{flex:1;}
 }
